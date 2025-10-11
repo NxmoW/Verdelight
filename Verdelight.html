@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>เกมไพ่ 2 ใบ – Bet แบบ FiveM (A ชนะทันที)</title>
+  <style>
+    :root{
+      --bg:#0b1320; --panel:#121a2b; --panel2:#0e1626; --text:#e8eefc; --muted:#9fb2d9; --acc:#4da3ff; --win:#22c55e; --lose:#ef4444; --tie:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; background:radial-gradient(1200px 700px at 30% -10%, #1b2b4d 0%, #0b1320 60%) fixed, var(--bg); color:var(--text)}
+    .container{max-width:980px; margin:32px auto; padding:0 16px}
+    h1{font-size:28px; margin:0 0 8px; letter-spacing:.3px}
+    p.subtitle{margin:0 0 16px; color:var(--muted)}
+    .board{display:grid; grid-template-columns:1fr 320px; gap:16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid #1f2a44; border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+    .row>label{font-size:14px; color:var(--muted)}
+    input[type="number"],button,select{appearance:none; background:#0c1322; border:1px solid #273555; color:var(--text); padding:10px 12px; border-radius:12px; font-size:14px}
+    input[type="number"]{width:120px}
+    button{cursor:pointer; transition:.15s ease; font-weight:600}
+    button:hover{transform:translateY(-1px); box-shadow:0 6px 16px rgba(0,0,0,.35)}
+    button.primary{background:linear-gradient(180deg,#1b64ff,#184dd9); border-color:#2a6fff}
+    button.secondary{background:#0f1a2d}
+    button.ghost{background:transparent}
+    button:disabled{opacity:.5; cursor:not-allowed; transform:none; box-shadow:none}
+
+    .flex{display:flex; align-items:center; justify-content:space-between; gap:12px}
+    .stack{display:flex; flex-direction:column; gap:12px}
+    .cards{display:flex; gap:10px; min-height:96px; align-items:center}
+    .c{width:72px; height:96px; border-radius:10px; background:#eaeef7; color:#111; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px solid #d7dcee; position:relative; font-weight:800}
+    .c .rank{font-size:20px}
+    .c .suit{font-size:20px}
+    .c.red{color:#b00020}
+    .tag{font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid #2a3a5f; background:#0a1222; color:var(--muted)}
+    .tag.win{color:#d1fae5; background:rgba(34,197,94,.12); border-color:#1e8a4a}
+    .tag.lose{color:#fee2e2; background:rgba(239,68,68,.12); border-color:#a32626}
+    .tag.tie{color:#fff7ed; background:rgba(245,158,11,.12); border-color:#a3620b}
+
+    .panel-title{font-size:12px; letter-spacing:.5px; color:var(--muted); text-transform:uppercase}
+    .big{font-size:28px; font-weight:800}
+    .muted{color:var(--muted)}
+    .log{height:220px; overflow:auto; background:#0a1222; border:1px solid #1a2747; padding:12px; border-radius:12px}
+    .log p{margin:0 0 6px}
+    .divider{height:1px; background:#1a2644; margin:12px 0}
+
+    @media(max-width:900px){.board{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>เกมไพ่ 2 ใบ – ระบบ Bet แบบ FiveM</h1>
+    <p class="subtitle">กติกา: แจกไพ่คนละ 2 ใบ นับแต้มแบบป๊อกเด้ง (J Q K = 10) เอายอดหลักหน่วยชนะ แต้มสูงกว่าเป็นผู้ชนะ <b>ถ้ามี A ในมือ = ชนะอัตโนมัติ 100%</b> (ถ้าทั้งคู่มี A = เสมอ)</p>
+
+    <div class="board">
+      <!-- LEFT: TABLE -->
+      <section class="card">
+        <div class="flex">
+          <div class="stack">
+            <span class="panel-title">เงินคงเหลือ</span>
+            <div class="big" id="balance">฿ 1,000</div>
+          </div>
+          <div class="row">
+            <label for="bet">วางเดิมพัน</label>
+            <input id="bet" type="number" min="10" step="10" value="50"/>
+            <button id="dealBtn" class="primary">แจกไพ่</button>
+            <button id="newBtn" class="secondary" disabled>รอบถัดไป</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="stack">
+          <div class="flex">
+            <div>
+              <div class="panel-title">ผู้เล่น</div>
+              <div class="cards" id="playerCards"></div>
+            </div>
+            <div class="stack" style="align-items:flex-end">
+              <span class="panel-title">ผลลัพธ์ผู้เล่น</span>
+              <span id="playerScore" class="tag">—</span>
+            </div>
+          </div>
+
+          <div class="flex">
+            <div>
+              <div class="panel-title">เจ้ามือ</div>
+              <div class="cards" id="dealerCards"></div>
+            </div>
+            <div class="stack" style="align-items:flex-end">
+              <span class="panel-title">ผลลัพธ์เจ้ามือ</span>
+              <span id="dealerScore" class="tag">—</span>
+            </div>
+          </div>
+
+          <div class="flex">
+            <div class="panel-title">ผลการตัดสิน</div>
+            <div id="outcome" class="tag">—</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: CONTROLS -->
+      <aside class="card">
+        <div class="stack">
+          <div class="flex">
+            <span class="panel-title">สำรับไพ่</span>
+            <span class="tag" id="deckLeft">เหลือ 52 ใบ</span>
+          </div>
+
+          <div class="row">
+            <button id="shuffleBtn" class="ghost">สับไพ่ใหม่</button>
+            <label class="row" style="gap:6px">
+              <input id="autoShuffle" type="checkbox" checked /> สับอัตโนมัติ (<span class="muted">เหลือน้อยกว่า 10</span>)
+            </label>
+          </div>
+
+          <div class="row">
+            <button id="resetBtn" class="secondary">รีเซ็ตเงิน (฿1,000)</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="stack">
+            <span class="panel-title">บันทึกเกม</span>
+            <div id="log" class="log" aria-live="polite"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // ====== Utilities ======
+    const suits = ["♠","♥","♦","♣"]; // hearts & diamonds are red
+    const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+    const rankValue = r => ({A:1,J:11,Q:12,K:13}[r] || parseInt(r,10));
+
+    function makeDeck(){
+      const d=[];
+      for(const s of suits){
+        for(const r of ranks){
+          d.push({suit:s, rank:r, value:rankValue(r)});
+        }
+      }
+      return d;
+    }
+    function shuffle(a){
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    }
+
+    // ====== Game State ======
+    let deck = shuffle(makeDeck());
+    let balance = 1000;
+    let inRound = false;
+
+    // ====== DOM ======
+    const el = id=>document.getElementById(id);
+    const playerCardsEl = el('playerCards');
+    const dealerCardsEl = el('dealerCards');
+    const playerScoreEl = el('playerScore');
+    const dealerScoreEl = el('dealerScore');
+    const outcomeEl = el('outcome');
+    const deckLeftEl = el('deckLeft');
+    const logEl = el('log');
+
+    const dealBtn = el('dealBtn');
+    const newBtn = el('newBtn');
+    const betInput = el('bet');
+    const shuffleBtn = el('shuffleBtn');
+    const resetBtn = el('resetBtn');
+    const autoShuffle = el('autoShuffle');
+    const balanceEl = el('balance');
+
+    function formatMoney(n){
+      return '฿ ' + n.toLocaleString('th-TH');
+    }
+
+    function updateDeckLeft(){ deckLeftEl.textContent = `เหลือ ${deck.length} ใบ`; }
+    function updateBalance(){ balanceEl.textContent = formatMoney(balance); }
+
+    function log(msg){
+      const p = document.createElement('p');
+      p.innerHTML = msg;
+      logEl.prepend(p);
+    }
+
+    function cardEl(card){
+      const div = document.createElement('div');
+      const red = (card.suit==='♥' || card.suit==='♦');
+      div.className = 'c'+(red?' red':'');
+      div.innerHTML = `<div class="rank">${card.rank}</div><div class="suit">${card.suit}</div>`;
+      return div;
+    }
+
+    function clearTable(){
+      playerCardsEl.innerHTML = '';
+      dealerCardsEl.innerHTML = '';
+      playerScoreEl.className = 'tag';
+      dealerScoreEl.className = 'tag';
+      playerScoreEl.textContent = '—';
+      dealerScoreEl.textContent = '—';
+      outcomeEl.className = 'tag';
+      outcomeEl.textContent = '—';
+    }
+
+    function draw(){ return deck.pop(); }
+
+    function handScore(cards){
+      // A (Ace) = ชนะอัตโนมัติ
+      if(cards.some(c=>c.rank==='A')){
+        return {score:Infinity, label:'A ชนะ'};
+      }
+      // ป๊อกเด้ง logic: J Q K = 10, รวมแต้มแล้วเอาเลขหลักหน่วย
+      const norm = v => Math.min(v,10);
+      const total = cards.reduce((s,c)=> s + norm(c.value), 0);
+      const pts = total % 10;
+      return {score:pts, label:`${pts} แต้ม`};
+    }
+
+    function settle(player, dealer, bet){
+      // return {outcome:'win'|'lose'|'tie', delta}
+      if(player.score===Infinity && dealer.score===Infinity){
+        return {outcome:'tie', delta:0, note:'ทั้งคู่มี A'};
+      }
+      if(player.score===Infinity){
+        return {outcome:'win', delta:bet, note:'ผู้เล่นมี A ชนะอัตโนมัติ'};
+      }
+      if(dealer.score===Infinity){
+        return {outcome:'lose', delta:-bet, note:'เจ้ามือมี A ชนะอัตโนมัติ'};
+      }
+      if(player.score>dealer.score) return {outcome:'win', delta:bet};
+      if(player.score<dealer.score) return {outcome:'lose', delta:-bet};
+      return {outcome:'tie', delta:0};
+    }
+
+    function updateTag(el, kind, text){
+      el.className = 'tag ' + (kind||'');
+      el.textContent = text;
+    }
+
+    function ensureDeck(){
+      if(deck.length<10 && autoShuffle.checked){
+        deck = shuffle(makeDeck());
+        updateDeckLeft();
+        log('🔄 <span class="muted">สับไพ่ใหม่อัตโนมัติ (ไพ่เหลือน้อย)</span>');
+      }
+    }
+
+    dealBtn.addEventListener('click', ()=>{
+      const bet = Math.max(10, Math.floor(Number(betInput.value)||0));
+      if(inRound) return;
+      if(deck.length<4){
+        log('⚠️ <span class="muted">ไพ่ไม่พอ แจกไม่ได้ โปรดสับใหม่</span>');
+        return;
+      }
+      if(bet>balance){
+        log('⚠️ <span class="muted">เงินไม่พอสำหรับเดิมพันนี้</span>');
+        return;
+      }
+      betInput.value = bet;
+      inRound = true;
+      dealBtn.disabled = true;
+      newBtn.disabled = false;
+      clearTable();
+
+      const p = [draw(), draw()];
+      const d = [draw(), draw()];
+
+      p.forEach(c=>playerCardsEl.appendChild(cardEl(c)));
+      d.forEach(c=>dealerCardsEl.appendChild(cardEl(c)));
+      updateDeckLeft();
+
+      const ps = handScore(p), ds = handScore(d);
+      updateTag(playerScoreEl, ps.score===Infinity?'win':'', ps.label);
+      updateTag(dealerScoreEl, ds.score===Infinity?'win':'', ds.label);
+
+      const result = settle(ps, ds, bet);
+      balance += result.delta;
+      updateBalance();
+
+      if(result.outcome==='win') updateTag(outcomeEl,'win','คุณชนะ +'+formatMoney(bet));
+      else if(result.outcome==='lose') updateTag(outcomeEl,'lose','คุณแพ้ −'+formatMoney(bet));
+      else updateTag(outcomeEl,'tie','เสมอ (คืนเงิน)');
+
+      const note = result.note? ` <span class="muted">(${result.note})</span>` : '';
+      log(`🎲 เดิมพัน ${formatMoney(bet)} → <b>${outcomeEl.textContent}</b>${note}`);
+      ensureDeck();
+    });
+
+    newBtn.addEventListener('click', ()=>{
+      inRound = false;
+      dealBtn.disabled = false;
+      newBtn.disabled = true;
+      clearTable();
+    });
+
+    shuffleBtn.addEventListener('click', ()=>{
+      deck = shuffle(makeDeck());
+      updateDeckLeft();
+      log('🔀 สับไพ่ใหม่แล้ว');
+    });
+
+    resetBtn.addEventListener('click', ()=>{
+      balance = 1000; updateBalance();
+      log('💰 รีเซ็ตเงินเป็น ฿1,000');
+    });
+
+    // init
+    updateBalance();
+    updateDeckLeft();
+    log('พร้อมเล่น! ตั้งเดิมพันแล้วกด "แจกไพ่" ได้เลย');
+  </script>
+</body>
+</html>
